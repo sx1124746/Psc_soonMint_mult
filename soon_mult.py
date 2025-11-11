@@ -18,11 +18,9 @@ logger.add(sink=sys.stdout, format="<white>{time:YYYY-MM-DD HH:mm:ss}</white>"
                                    " | <cyan><b>{line}</b></cyan>"
                                    " - <white><b>{message}</b></white>")
 logger = logger.opt(colors=True)
-# 全局队列和标志
 task_queue = queue.Queue(maxsize=100)
-# result_queue = queue.Queue(maxsize=100)  # 暂时没吊用
 is_running = True
-lock = threading.Lock()  # 锁
+lock = threading.Lock()  
 
 
 def signature(private_key):
@@ -64,7 +62,6 @@ def signature(private_key):
     signable_message = encode_typed_data(full_message=message)
     signed = Account.sign_message(signable_message, private_key)
 
-    # 得到一个132位的signature
     signature_data = '0x' + signed.signature.hex()
 
     x_payment = {
@@ -82,12 +79,6 @@ def signature(private_key):
 
 
 def create_task(task_id, **kwargs) -> Dict[str, Any]:
-    """
-    生成者函数
-    :param task_id: 任务ID
-    :param kwargs:  看需要
-    :return:
-    """
     task = {
         "task_id": task_id,
         "url": kwargs.get('url'),
@@ -119,7 +110,6 @@ def create_task(task_id, **kwargs) -> Dict[str, Any]:
 
 
 def producer() -> None:
-    """生产者函数 - 纯同步实现"""
     task_id = 0
     while True:
         with lock:
@@ -148,12 +138,11 @@ def producer() -> None:
         logger.info(f"gao | Sign | ID : {task_id} | Type：{task2['data']['direction']} | ApartSign：{task2['headers']['x-payment'][150:170]}")
         task_id += 1
 
-        time.sleep(0.5)  # 每秒1个任务
+        time.sleep(0.5)  # 每秒任务
 
 
 def consumer(max_workers_num) -> None:
-    """消费者函数 - 使用线程池异步处理请求"""
-    # 线程池
+    """消费者函数"""
     with ThreadPoolExecutor(max_workers=max_workers_num) as executor:
         while True:
             with lock:
@@ -182,17 +171,14 @@ def process_request(task) -> None:
             'task': task,
             'result': response.json(),
         }
-        # result_queue.put(result)
         logger.success(f"<light-green>Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}</light-green>")
     except requests.exceptions.HTTPError as e:
         result = {
             'task': task,
             'error': str(e),
         }
-        # result_queue.put(result)
         if e.response is not None:
             if e.response.status_code == 402:
-                # 把e.response.text转成 json
                 json_data = json.loads(e.response.text)
                 logger.warning(f"<light-yellow>gao | reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Error：{json_data['error']}</light-yellow>")
             else:
