@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import signal
 from loguru import logger
 
+# 配置日志设置
 logger.remove()
 logger.add(sink=sys.stdout, format="<white>{time:YYYY-MM-DD HH:mm:ss}</white>"
                                    " | <level>{level: <8}</level>"
