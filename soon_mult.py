@@ -15,9 +15,8 @@ from loguru import logger
 
 # 全局队列和标志
 task_queue = queue.Queue(maxsize=100)
-# result_queue = queue.Queue(maxsize=100)  # 暂时没吊用
 is_running = True
-lock = threading.Lock()  # 锁
+lock = threading.Lock()  
 
 
 def signature(private_key):
@@ -59,7 +58,6 @@ def signature(private_key):
     signable_message = encode_typed_data(full_message=message)
     signed = Account.sign_message(signable_message, private_key)
 
-    # 得到一个132位的signature
     signature_data = '0x' + signed.signature.hex()
 
     x_payment = {
@@ -143,12 +141,11 @@ def producer() -> None:
         logger.info(f"Sign | ID : {task_id} | Type：{task2['data']['direction']} | ApartSign：{task2['headers']['x-payment'][150:170]}")
         task_id += 1
 
-        time.sleep(0.5)  # 每秒1个任务
+        time.sleep(0.5)  # 秒任务
 
 
 def consumer(max_workers_num) -> None:
-    """消费者函数 - 使用线程池异步处理请求"""
-    # 线程池
+    """消费者函数 - 线程池异步处理"""
     with ThreadPoolExecutor(max_workers=max_workers_num) as executor:
         while True:
             with lock:
@@ -177,7 +174,6 @@ def process_request(task) -> None:
             'task': task,
             'result': response.json(),
         }
-        # result_queue.put(result)
         logger.success(f"Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}")
     except requests.exceptions.HTTPError as e:
         result = {
