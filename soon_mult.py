@@ -138,7 +138,7 @@ def producer() -> None:
         logger.info(f"gao | Sign | ID : {task_id} | Type：{task2['data']['direction']} | ApartSign：{task2['headers']['x-payment'][150:170]}")
         task_id += 1
 
-        time.sleep(0.5)  # 每秒任务
+        time.sleep(0.5)  # 签名间隔
 
 
 def consumer(max_workers_num) -> None:
@@ -158,7 +158,7 @@ def consumer(max_workers_num) -> None:
 
 
 def process_request(task) -> None:
-    """实际处理HTTP请求"""
+    """HTTP请求"""
     try:
         response = requests.post(
             task['url'],
