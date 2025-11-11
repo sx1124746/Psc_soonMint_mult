@@ -12,11 +12,17 @@ from concurrent.futures import ThreadPoolExecutor
 import signal
 from loguru import logger
 
-
+logger.remove()
+logger.add(sink=sys.stdout, format="<white>{time:YYYY-MM-DD HH:mm:ss}</white>"
+                                   " | <level>{level: <8}</level>"
+                                   " | <cyan><b>{line}</b></cyan>"
+                                   " - <white><b>{message}</b></white>")
+logger = logger.opt(colors=True)
 # 全局队列和标志
 task_queue = queue.Queue(maxsize=100)
+# result_queue = queue.Queue(maxsize=100)  # 暂时没吊用
 is_running = True
-lock = threading.Lock()  
+lock = threading.Lock()  # 锁
 
 
 def signature(private_key):
@@ -58,6 +64,7 @@ def signature(private_key):
     signable_message = encode_typed_data(full_message=message)
     signed = Account.sign_message(signable_message, private_key)
 
+    # 得到一个132位的signature
     signature_data = '0x' + signed.signature.hex()
 
     x_payment = {
@@ -127,7 +134,7 @@ def producer() -> None:
         }
         task = create_task(task_id=task_id, **parameters1)
         task_queue.put(task)
-        logger.info(f"Sign | ID : {task_id} | Type：{task['data']['direction']} | ApartSign：{task['headers']['x-payment'][150:170]}")
+        logger.info(f"gao | Sign | ID : {task_id} | Type：{task['data']['direction']} | ApartSign：{task['headers']['x-payment'][150:170]}")
         task_id += 1
 
         # 签名+down
@@ -138,14 +145,15 @@ def producer() -> None:
         }
         task2 = create_task(task_id=task_id, **parameters2)
         task_queue.put(task2)
-        logger.info(f"Sign | ID : {task_id} | Type：{task2['data']['direction']} | ApartSign：{task2['headers']['x-payment'][150:170]}")
+        logger.info(f"gao | Sign | ID : {task_id} | Type：{task2['data']['direction']} | ApartSign：{task2['headers']['x-payment'][150:170]}")
         task_id += 1
 
-        time.sleep(0.5)  # 秒任务
+        time.sleep(0.5)  # 每秒1个任务
 
 
 def consumer(max_workers_num) -> None:
-    """消费者函数 - 线程池异步处理"""
+    """消费者函数 - 使用线程池异步处理请求"""
+    # 线程池
     with ThreadPoolExecutor(max_workers=max_workers_num) as executor:
         while True:
             with lock:
@@ -174,7 +182,8 @@ def process_request(task) -> None:
             'task': task,
             'result': response.json(),
         }
-        logger.success(f"Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}")
+        # result_queue.put(result)
+        logger.success(f"<light-green>Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}</light-green>")
     except requests.exceptions.HTTPError as e:
         result = {
             'task': task,
@@ -183,11 +192,13 @@ def process_request(task) -> None:
         # result_queue.put(result)
         if e.response is not None:
             if e.response.status_code == 402:
-                logger.warning(f"Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Error：{result['error']}")
+                # 把e.response.text转成 json
+                json_data = json.loads(e.response.text)
+                logger.warning(f"<light-yellow>gao | reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Error：{json_data['error']}</light-yellow>")
             else:
-                logger.error(f"Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Error：{result['error']}")
+                logger.error(f"<light-red>gao | reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Error：{result['error']}</light-red>")
         else:
-            logger.error(f"Reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}")
+            logger.error(f"<light-red>gao | reqs | ID : {result['task']['task_id']} | Type: {result['task']['data']['direction']} | Result：{result['result']}</light-red>")
 
 
 def shutdown_handler(signum, frame):
